@@ -9,4 +9,10 @@ export const createSwaggerConfig = (port: number) =>
     .setVersion('1.0')
     .setContact('Vadim', 'https://github.com/thekinv21', 'thekinv21@gmail.com')
     .addServer(`http://localhost:${port}`, 'Local Development')
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'Paste the accessToken returned by POST /auth/login',
+    })
     .build();

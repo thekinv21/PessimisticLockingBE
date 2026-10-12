@@ -58,6 +58,7 @@ async function bootstrap() {
       cleanupOpenApiDoc(
         SwaggerModule.createDocument(app, createSwaggerConfig(port)),
       ),
+      { swaggerOptions: { persistAuthorization: true } },
     );
   }
 

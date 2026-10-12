@@ -2,15 +2,14 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { hash } from 'argon2';
 import 'dotenv/config';
 
-import { Role } from '../src/shared/constants/RoleConstant';
+import { Role, SEED_OWNER_EMAIL, SEED_PASSWORD } from '@/shared/constants';
+
 import { PrismaClient } from './generated/prisma/client';
 
 /**
  * Development seed: creates every role and one test user per role.
  * Idempotent; re-running resets the test users' password and roles.
  */
-
-const SEED_PASSWORD = 'Password123!';
 
 const ROLES = [
   { name: Role.OWNER, description: 'Full access to everything' },
@@ -20,7 +19,7 @@ const ROLES = [
 ];
 
 const USERS = [
-  { fullName: 'Owner User', email: 'owner@example.com', role: Role.OWNER },
+  { fullName: 'Owner User', email: SEED_OWNER_EMAIL, role: Role.OWNER },
   { fullName: 'Admin User', email: 'admin@example.com', role: Role.ADMIN },
   { fullName: 'Second Admin', email: 'admin2@example.com', role: Role.ADMIN },
   {
