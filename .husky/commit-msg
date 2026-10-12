@@ -10,7 +10,3 @@ if ! printf '%s' "$HEADER" | grep -Eq "$PATTERN"; then
   exit 1
 fi
 
-# git allows a single hooks dir, so also run the frontend hook (once)
-if [ -z "$HUSKY_SIBLING" ] && [ -f frontend/.husky/commit-msg ]; then
-  HUSKY_SIBLING=1 sh frontend/.husky/commit-msg "$@" || exit 1
-fi

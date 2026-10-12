@@ -15,7 +15,7 @@
     "start:debug": "bun --inspect --watch src/main.ts",
     "start:prod": "bun src/main.ts",
     "lint": "oxlint --type-aware src/ test/",
-    "prepare": "cd .. && husky backend/.husky",
+    "prepare": "husky",
     "db:migrate": "bunx --bun prisma migrate dev",
     "db:generate": "bunx --bun prisma generate",
     "db:studio": "bunx --bun prisma studio"
