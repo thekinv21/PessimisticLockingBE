@@ -9,7 +9,6 @@ import { verify } from 'argon2';
 
 import { Role } from '@/shared/constants';
 import { PrismaService } from '@/shared/prisma';
-import { TJwtPayload } from '@/shared/types';
 
 import { UserDto } from '../user/dto/response';
 import { UserService } from '../user/UserService';
@@ -167,10 +166,9 @@ export class AuthService {
     };
 
     const tokens = await this.jwtTokenService.generateTokens({
-      tokenVersion,
       sub: user.id,
-      roles: user.roles.map(({ name }) => name),
-    } satisfies TJwtPayload);
+      tokenVersion,
+    });
 
     return { user, ...tokens };
   }

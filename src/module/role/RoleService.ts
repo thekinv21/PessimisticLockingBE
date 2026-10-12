@@ -8,12 +8,12 @@ import {
 import { PROTECTED_ROLES, Role } from '@/shared/constants';
 import { PageDto, QueryDto } from '@/shared/dto';
 import { PrismaService } from '@/shared/prisma';
-import type { TJwtPayload } from '@/shared/types';
+import type { TCurrentUser } from '@/shared/types';
 
 import { CreateRoleDto, UpdateRoleDto } from './dto/request';
 import { RoleDto } from './dto/response';
 
-type TActor = Pick<TJwtPayload, 'roles'>;
+type TActor = Pick<TCurrentUser, 'roles'>;
 
 @Injectable()
 export class RoleService {

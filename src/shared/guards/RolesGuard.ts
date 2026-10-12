@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
 import { ROLES_KEY, type TRoleName } from '../decorators/PreAuthorizeDecorator';
-import type { TJwtPayload } from '../types';
+import type { TCurrentUser } from '../types';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -25,7 +25,7 @@ export class RolesGuard implements CanActivate {
 
     const { user } = context
       .switchToHttp()
-      .getRequest<Request & { user?: TJwtPayload }>();
+      .getRequest<Request & { user?: TCurrentUser }>();
 
     if (!user?.roles.some((role) => required.includes(role as TRoleName))) {
       throw new ForbiddenException(

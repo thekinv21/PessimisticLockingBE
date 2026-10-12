@@ -10,7 +10,7 @@ import type { Request } from 'express';
 import { JwtTokenService } from '@/module/auth/jwt';
 
 import { PrismaService } from '../prisma';
-import type { TJwtPayload } from '../types';
+import type { TCurrentUser, TJwtPayload } from '../types';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -22,7 +22,7 @@ export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
       .switchToHttp()
-      .getRequest<Request & { user?: TJwtPayload }>();
+      .getRequest<Request & { user?: TCurrentUser }>();
 
     const [type, token, ...rest] =
       request.headers.authorization?.split(' ') ?? [];
@@ -67,7 +67,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     request.user = {
-      ...payload,
+      sub: payload.sub,
       roles: user.roles.map(({ role }) => role.name),
     };
 

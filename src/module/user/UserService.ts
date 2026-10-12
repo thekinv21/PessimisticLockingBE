@@ -11,13 +11,13 @@ import { hash } from 'argon2';
 import { Role, RoleRank } from '@/shared/constants';
 import { FindIsActiveQueryDto, PageDto, QueryDto } from '@/shared/dto';
 import { PrismaService } from '@/shared/prisma';
-import { TJwtPayload } from '@/shared/types';
+import { TCurrentUser } from '@/shared/types';
 
 import type { Prisma } from '../../../prisma/generated/prisma/client';
 import { CreateUserDto, UpdateUserDto } from './dto/request';
 import { UserDto } from './dto/response';
 
-type TActor = Pick<TJwtPayload, 'sub' | 'roles'>;
+type TActor = Pick<TCurrentUser, 'sub' | 'roles'>;
 
 type TCreateAccount = Omit<CreateUserDto, 'roles'> & {
   roleIds: string[];

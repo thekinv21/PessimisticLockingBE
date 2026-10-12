@@ -19,7 +19,7 @@ import {
   PageDto,
   QueryDto,
 } from '@/shared/dto';
-import type { TJwtPayload } from '@/shared/types';
+import type { TCurrentUser } from '@/shared/types';
 
 import { CreateUserDto, UpdateUserDto } from './dto/request';
 import { UserDto } from './dto/response';
@@ -40,7 +40,7 @@ export class UserController {
   })
   async findAll(
     @Query() query: FindIsActiveQueryDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<UserDto[] | undefined> {
     return this.userService.findAll(query, actor);
   }
@@ -55,7 +55,7 @@ export class UserController {
   })
   async findByPagination(
     @Query() query: QueryDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<PageDto<UserDto> | undefined> {
     return this.userService.findByPagination(query, actor);
   }
@@ -68,7 +68,7 @@ export class UserController {
   })
   async findByUnique(
     @Param() { id }: IdParamDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<UserDto | undefined> {
     return this.userService.findByUnique(id, actor);
   }
@@ -79,7 +79,7 @@ export class UserController {
     type: UserDto,
   })
   async findUserProfile(
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<UserDto | undefined> {
     return this.userService.findByUnique(actor.sub, actor);
   }
@@ -92,7 +92,7 @@ export class UserController {
   })
   async create(
     @Body() dto: CreateUserDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.userService.create(dto, actor);
   }
@@ -102,7 +102,7 @@ export class UserController {
   @Endpoint({ summary: 'Update a user' })
   async update(
     @Body() dto: UpdateUserDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.userService.update(dto, actor);
   }
@@ -115,7 +115,7 @@ export class UserController {
   })
   async toggle(
     @Param() { id }: IdParamDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.userService.toggle(id, actor);
   }
@@ -125,7 +125,7 @@ export class UserController {
   @Endpoint({ summary: 'Delete a user' })
   async delete(
     @Param() { id }: IdParamDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.userService.delete(id, actor);
   }

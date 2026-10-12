@@ -18,7 +18,7 @@ import {
   PageDto,
   QueryDto,
 } from '@/shared/dto';
-import type { TJwtPayload } from '@/shared/types';
+import type { TCurrentUser } from '@/shared/types';
 
 import { CreateRoleDto, UpdateRoleDto } from './dto/request';
 import { RoleDto } from './dto/response';
@@ -88,7 +88,7 @@ export class RoleController {
   })
   async update(
     @Body() body: UpdateRoleDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.roleService.update(body, actor);
   }
@@ -102,7 +102,7 @@ export class RoleController {
   })
   async toggle(
     @Param() { id }: IdParamDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.roleService.toggle(id, actor);
   }
@@ -116,7 +116,7 @@ export class RoleController {
   })
   async delete(
     @Param() { id }: IdParamDto,
-    @CurrentUser() actor: TJwtPayload,
+    @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
     await this.roleService.delete(id, actor);
   }
