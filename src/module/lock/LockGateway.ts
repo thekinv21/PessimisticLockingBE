@@ -11,14 +11,12 @@ import type { Namespace } from 'socket.io';
 import type { z } from 'zod';
 
 import {
-  LOCK_ALLOWED_ROLES,
   LOCK_NAMESPACE,
   LOCK_PING_INTERVAL_MS,
   LOCK_PING_TIMEOUT_MS,
   LOCK_RATE_LIMIT,
   LockEvent,
 } from '@/shared/constants';
-import type { TJwtPayload } from '@/shared/types';
 
 import { env } from '@/config';
 import { JwtTokenService } from '@/module/auth/jwt';
@@ -29,6 +27,7 @@ import { LockService } from './LockService';
 import type {
   TEditLock,
   TLockAck,
+  TLockGrant,
   TLockSession,
   TLockSocket,
 } from './LockTypes';
@@ -42,6 +41,8 @@ const RATE_LIMITED: TLockAck<never> = {
   ok: false,
   error: 'Too many requests. Please slow down.',
 };
+
+const UNAUTHORIZED: TLockAck<never> = { ok: false, error: 'Unauthorized.' };
 
 type TRateWindow = { count: number; resetAt: number };
 
@@ -121,11 +122,35 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
 
   /**
    * @description Called when the edit form opens. The session is re-read so
-   * a revoked token or removed role cannot take new locks.
+   * a revoked token or deactivated user cannot take new locks. The returned
+   * token must be sent with the REST write in the X-Lock-Token header.
    */
 
   @SubscribeMessage(LockEvent.ACQUIRE)
   async acquire(
+    @ConnectedSocket() socket: TLockSocket,
+    @MessageBody() body: unknown,
+  ): Promise<TLockAck<TLockGrant>> {
+    if (!this.allow(socket)) return RATE_LIMITED;
+
+    const payload = this.parse(LockTargetSchema, body);
+
+    if (!payload) return INVALID_PAYLOAD;
+
+    const session = await this.refreshSession(socket);
+
+    if (!session) return UNAUTHORIZED;
+
+    return this.lockService.acquire(socket.id, session, payload);
+  }
+
+  /**
+   * @description The session is re-read so a user whose token was revoked or
+   * account deactivated cannot keep a lock alive; the disconnect releases it.
+   */
+
+  @SubscribeMessage(LockEvent.RENEW)
+  async renew(
     @ConnectedSocket() socket: TLockSocket,
     @MessageBody() body: unknown,
   ): Promise<TLockAck<TEditLock>> {
@@ -135,38 +160,13 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     if (!payload) return INVALID_PAYLOAD;
 
-    const session = await this.loadSession({
-      sub: socket.data.userId,
-      tokenVersion: socket.data.tokenVersion,
-    });
-
-    if (!session) {
-      socket.disconnect(true);
-
-      return { ok: false, error: 'Unauthorized.' };
-    }
-
-    socket.data = session;
-
-    return this.lockService.acquire(socket.id, session, payload);
-  }
-
-  @SubscribeMessage(LockEvent.RENEW)
-  renew(
-    @ConnectedSocket() socket: TLockSocket,
-    @MessageBody() body: unknown,
-  ): TLockAck<TEditLock> {
-    if (!this.allow(socket)) return RATE_LIMITED;
-
-    const payload = this.parse(LockTargetSchema, body);
-
-    if (!payload) return INVALID_PAYLOAD;
+    if (!(await this.refreshSession(socket))) return UNAUTHORIZED;
 
     return this.lockService.renew(socket.id, payload);
   }
 
   /**
-   * @description Called when the edit form closes (save, cancel, route
+   * @description Called when the edit form closes without saving (cancel, route
    * change). Closing the tab is handled by the disconnect.
    */
 
@@ -185,8 +185,8 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   /**
-   * @throws When the token is missing, invalid, revoked or the user may not
-   * edit records
+   * @throws When the token is missing, invalid or revoked, or the user is
+   * inactive
    */
 
   private async authenticate(socket: TLockSocket): Promise<void> {
@@ -198,7 +198,7 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
       token.replace(/^Bearer /, ''),
     );
 
-    const session = await this.loadSession(payload);
+    const session = await this.sessionService.load(payload);
 
     if (!session) throw new Error('Session is not allowed');
 
@@ -206,18 +206,25 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   /**
-   * @returns null when the session is revoked or holds none of the
-   * LOCK_ALLOWED_ROLES
+   * @returns The current session, or null after disconnecting the socket
+   * when it is no longer allowed
    */
 
-  private async loadSession(
-    payload: TJwtPayload,
+  private async refreshSession(
+    socket: TLockSocket,
   ): Promise<TLockSession | null> {
-    const session = await this.sessionService.load(payload);
+    const session = await this.sessionService.load({
+      sub: socket.data.userId,
+      tokenVersion: socket.data.tokenVersion,
+    });
 
-    if (!session?.roles.some((role) => LOCK_ALLOWED_ROLES.includes(role))) {
+    if (!session) {
+      socket.disconnect(true);
+
       return null;
     }
+
+    socket.data = session;
 
     return session;
   }

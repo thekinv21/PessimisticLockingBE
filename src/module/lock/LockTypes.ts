@@ -24,8 +24,15 @@ export type TEditLock = TLockTarget & {
   expiresAt: string;
 };
 
+/**
+ * Lock state as sent to the holder only. The token proves over REST that a
+ * write comes from the tab holding the lock; it is never broadcast.
+ */
+
+export type TLockGrant = TEditLock & { token: string };
+
 export type TLockReleaseReason =
-  'released' | 'expired' | 'disconnected' | 'deleted';
+  'released' | 'saved' | 'expired' | 'disconnected' | 'deleted';
 
 export type TLockReleased = TLockTarget & { reason: TLockReleaseReason };
 
@@ -52,10 +59,6 @@ export type TLockSocket = Socket<
   Record<string, never>,
   TLockSession
 >;
-
-/**
- * Acknowledgement returned to every client event.
- */
 
 export type TLockAck<T = undefined> =
   { ok: true; data: T } | { ok: false; error: string; lock?: TEditLock };

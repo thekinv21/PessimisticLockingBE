@@ -1,5 +1,3 @@
-import { Role } from './RoleConstant';
-
 const SECOND = 1_000;
 
 export const LOCK_NAMESPACE = '/locks';
@@ -26,17 +24,18 @@ export const LockEvent = {
   /**
    * server -> client
    */
+
   ACQUIRED: 'lock:acquired',
   RELEASED: 'lock:released',
   RECORD_CHANGED: 'record:changed',
 } as const;
 
 /**
- * Roles allowed to connect to the lock namespace; matches the roles allowed
- * to update records over REST.
+ * Header carrying the token returned by `lock:acquire`; REST writes must send
+ * it to prove they come from the tab holding the lock.
  */
 
-export const LOCK_ALLOWED_ROLES: readonly string[] = [Role.OWNER, Role.ADMIN];
+export const LOCK_TOKEN_HEADER = 'x-lock-token';
 
 /**
  * A lock is released when the holder sends no `lock:renew` for this long,

@@ -79,16 +79,22 @@ export class PostService {
    * @param id Unique identifier of the post
    * @param dto Post update data
    * @param actor The signed-in user performing the operation
+   * @param lockToken Token of the edit lock held by the caller's tab
    * @returns void
-   * @throws 423 Locked while another user edits the post
+   * @throws 423 Locked while another tab edits the post
+   * @throws 428 Precondition Required when the caller does not hold the lock
    */
 
-  async update(id: number, dto: UpdatePostDto, actor: TActor): Promise<void> {
-    await this.findByUnique(id);
-
+  async update(
+    id: number,
+    dto: UpdatePostDto,
+    actor: TActor,
+    lockToken?: string,
+  ): Promise<void> {
     await this.lockService.guardWrite(
       { resource: LockResource.POST, id: String(id) },
       actor,
+      lockToken,
       'updated',
       () =>
         this.prisma.post.update({
@@ -105,16 +111,16 @@ export class PostService {
   /**
    * @param id Unique identifier of the post
    * @param actor The signed-in user performing the operation
+   * @param lockToken Token of the edit lock, when the caller's tab holds it
    * @returns void
-   * @throws 423 Locked while another user edits the post
+   * @throws 423 Locked while another tab edits the post
    */
 
-  async delete(id: number, actor: TActor): Promise<void> {
-    await this.findByUnique(id);
-
+  async delete(id: number, actor: TActor, lockToken?: string): Promise<void> {
     await this.lockService.guardWrite(
       { resource: LockResource.POST, id: String(id) },
       actor,
+      lockToken,
       'deleted',
       () => this.prisma.post.delete({ where: { id } }),
     );

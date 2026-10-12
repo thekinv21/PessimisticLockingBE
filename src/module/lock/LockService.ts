@@ -5,6 +5,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 
+import { randomUUID } from 'node:crypto';
 import type { Namespace } from 'socket.io';
 
 import {
@@ -19,6 +20,7 @@ import type { TCurrentUser } from '@/shared/types';
 import type {
   TEditLock,
   TLockAck,
+  TLockGrant,
   TLockReleased,
   TLockReleaseReason,
   TLockResource,
@@ -32,6 +34,7 @@ type TActor = Pick<TCurrentUser, 'sub'>;
 
 type TLockEntry = TEditLock & {
   socketId: string;
+  token: string;
   timer?: ReturnType<typeof setTimeout>;
 };
 
@@ -51,6 +54,13 @@ export class LockService implements OnModuleDestroy {
 
   private readonly socketLocks = new Map<string, Set<string>>();
 
+  /**
+   * Keys of records with a REST write in flight; they cannot be locked until
+   * the write settles, so nobody opens a form on data about to change.
+   */
+
+  private readonly writing = new Set<string>();
+
   constructor(private readonly prisma: PrismaService) {}
 
   attach(server: Namespace): void {
@@ -61,6 +71,7 @@ export class LockService implements OnModuleDestroy {
     this.locks.forEach(({ timer }) => clearTimeout(timer));
     this.locks.clear();
     this.socketLocks.clear();
+    this.writing.clear();
   }
 
   /**
@@ -90,10 +101,19 @@ export class LockService implements OnModuleDestroy {
   async acquire(
     socketId: string,
     session: TLockSession,
-    target: TLockTarget,
-  ): Promise<TLockAck<TEditLock>> {
-    if (!(await this.exists(target))) {
-      return { ok: false, error: 'Record not found.' };
+    input: TLockTarget,
+  ): Promise<TLockAck<TLockGrant>> {
+    const target = await this.resolve(input);
+
+    if (!target) return { ok: false, error: 'Record not found.' };
+
+    /**
+     * The tab may have closed while the record was loading; its releaseAll
+     * already ran, so a lock taken now would never be freed.
+     */
+
+    if (this.server && !this.server.sockets.has(socketId)) {
+      return { ok: false, error: 'Disconnected.' };
     }
 
     /**
@@ -105,14 +125,24 @@ export class LockService implements OnModuleDestroy {
     const existing = this.locks.get(key);
 
     if (existing?.socketId === socketId) {
-      return { ok: true, data: this.touch(existing) };
+      return { ok: true, data: this.toGrant(existing) };
     }
 
     if (existing) {
       return {
         ok: false,
-        error: `This record is currently being edited by ${existing.holder.fullName}.`,
+        error:
+          existing.holder.userId === session.userId
+            ? 'You are already editing this record in another tab.'
+            : `This record is currently being edited by ${existing.holder.fullName}.`,
         lock: this.toPublic(existing),
+      };
+    }
+
+    if (this.writing.has(key)) {
+      return {
+        ok: false,
+        error: 'This record is being saved. Please try again.',
       };
     }
 
@@ -132,16 +162,17 @@ export class LockService implements OnModuleDestroy {
       acquiredAt: new Date().toISOString(),
       expiresAt: '',
       socketId,
+      token: randomUUID(),
     };
 
     this.locks.set(key, entry);
     this.socketLocks.set(socketId, held.add(key));
 
-    const lock = this.touch(entry);
+    const grant = this.toGrant(entry);
 
-    this.emit(LockEvent.ACQUIRED, lock);
+    this.emit(LockEvent.ACQUIRED, this.toPublic(entry));
 
-    return { ok: true, data: lock };
+    return { ok: true, data: grant };
   }
 
   /**
@@ -150,7 +181,7 @@ export class LockService implements OnModuleDestroy {
    */
 
   renew(socketId: string, target: TLockTarget): TLockAck<TEditLock> {
-    const entry = this.locks.get(this.keyOf(target));
+    const entry = this.locks.get(this.keyOf(this.canonical(target)));
 
     if (entry?.socketId !== socketId) {
       return { ok: false, error: 'You do not hold the lock on this record.' };
@@ -165,7 +196,7 @@ export class LockService implements OnModuleDestroy {
    */
 
   release(socketId: string, target: TLockTarget): TLockAck {
-    const entry = this.locks.get(this.keyOf(target));
+    const entry = this.locks.get(this.keyOf(this.canonical(target)));
 
     if (entry?.socketId === socketId) this.drop(entry, 'released');
 
@@ -185,56 +216,81 @@ export class LockService implements OnModuleDestroy {
   /**
    * @param target The record being written
    * @param actor The signed-in user performing the write
+   * @param token The token `lock:acquire` returned to the writing tab
    * @param action Broadcast to watchers after the write succeeds
    * @param write The database write
-   * @throws 423 Locked when another user holds the lock on the record
-   * @description REST counterpart of the socket lock: a write is rejected
-   * while someone else edits the record, then every watcher is told that it
-   * changed so they can refetch it.
+   * @throws 423 Locked when another tab holds the lock on the record
+   * @throws 428 Precondition Required when an update is sent without holding
+   * the lock
+   * @description REST counterpart of the socket lock: an update must come
+   * from the tab holding the lock, a delete only from it while the record is
+   * locked. Every watcher is then told that the record changed, and the
+   * lock is released.
    */
 
   async guardWrite<T>(
     target: TLockTarget,
     actor: TActor,
+    token: string | undefined,
     action: TRecordChangeAction,
     write: () => Promise<T>,
   ): Promise<T> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: actor.sub },
-      select: { fullName: true },
-    });
+    const key = this.keyOf(this.canonical(target));
+    const lock = this.locks.get(key);
 
-    /**
-     * No await between the lock check and starting the write, so a lock
-     * taken while the name was loading is still seen.
-     */
-
-    const lock = this.locks.get(this.keyOf(target));
-
-    if (lock && lock.holder.userId !== actor.sub) {
+    if (lock && (lock.token !== token || lock.holder.userId !== actor.sub)) {
       throw new HttpException(
-        `This record is currently being edited by ${lock.holder.fullName}.`,
+        lock.holder.userId === actor.sub
+          ? 'You are editing this record in another tab.'
+          : `This record is currently being edited by ${lock.holder.fullName}.`,
         HttpStatus.LOCKED,
       );
     }
 
-    const result = await write();
+    if (!lock && action === 'updated') {
+      throw new HttpException(
+        'Your edit lock has expired. Reopen the record to edit it.',
+        HttpStatus.PRECONDITION_REQUIRED,
+      );
+    }
 
-    const current = this.locks.get(this.keyOf(target));
+    if (this.writing.has(key)) {
+      throw new HttpException(
+        'This record is being saved. Please try again.',
+        HttpStatus.LOCKED,
+      );
+    }
 
-    if (action === 'deleted' && current) this.drop(current, 'deleted');
+    this.writing.add(key);
 
-    const change: TRecordChanged = {
-      resource: target.resource,
-      id: target.id,
-      action,
-      by: { userId: actor.sub, fullName: user?.fullName ?? '' },
-      at: new Date().toISOString(),
-    };
+    try {
+      const result = await write();
 
-    this.emit(LockEvent.RECORD_CHANGED, change);
+      const change: TRecordChanged = {
+        resource: target.resource,
+        id: this.canonical(target).id,
+        action,
+        by: {
+          userId: actor.sub,
+          fullName: lock?.holder.fullName ?? (await this.fullNameOf(actor)),
+        },
+        at: new Date().toISOString(),
+      };
 
-    return result;
+      /**
+       * Changed before released: watchers refetch the record before it
+       * becomes editable. The holder's tab leaves the page after saving, so
+       * the lock is freed here instead of waiting for its release.
+       */
+
+      this.emit(LockEvent.RECORD_CHANGED, change);
+
+      if (lock) this.drop(lock, action === 'deleted' ? 'deleted' : 'saved');
+
+      return result;
+    } finally {
+      this.writing.delete(key);
+    }
   }
 
   /**
@@ -286,21 +342,58 @@ export class LockService implements OnModuleDestroy {
     (socketId ? room.to(socketId) : room).emit(event, payload);
   }
 
-  private async exists({ resource, id }: TLockTarget): Promise<boolean> {
-    switch (resource) {
-      case LockResource.POST: {
-        const postId = Number(id);
+  /**
+   * @returns The canonical target when the record exists, otherwise null
+   */
 
-        if (!Number.isSafeInteger(postId)) return false;
+  private async resolve(target: TLockTarget): Promise<TLockTarget | null> {
+    const canonical = this.canonical(target);
+
+    switch (canonical.resource) {
+      case LockResource.POST: {
+        const postId = Number(canonical.id);
+
+        if (!Number.isSafeInteger(postId) || String(postId) !== canonical.id) {
+          return null;
+        }
 
         const post = await this.prisma.post.findUnique({
           where: { id: postId },
           select: { id: true },
         });
 
-        return post !== null;
+        return post ? canonical : null;
       }
     }
+  }
+
+  /**
+   * @description One spelling per record, so '01', '1.0' and '0x1' cannot
+   * lock post 1 under different keys. Ids that are not positive integers are
+   * kept as they are and never match an existing record.
+   */
+
+  private canonical({ resource, id }: TLockTarget): TLockTarget {
+    switch (resource) {
+      case LockResource.POST:
+        return {
+          resource,
+          id: /^\d+$/.test(id) ? String(Number(id)) : id,
+        };
+    }
+  }
+
+  private async fullNameOf(actor: TActor): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: actor.sub },
+      select: { fullName: true },
+    });
+
+    return user?.fullName ?? '';
+  }
+
+  private toGrant(entry: TLockEntry): TLockGrant {
+    return { ...this.touch(entry), token: entry.token };
   }
 
   private toPublic({
