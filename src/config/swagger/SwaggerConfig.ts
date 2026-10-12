@@ -2,9 +2,9 @@ import { DocumentBuilder } from '@nestjs/swagger';
 
 export const createSwaggerConfig = (port: number) =>
   new DocumentBuilder()
-    .setTitle('WebSocket Real-Time Notifications API')
+    .setTitle('Post Locking & Real-Time Sync API')
     .setDescription(
-      'A real-time notification system built with **Next.js 16** and **NestJS 11**, using **WebSockets** for bidirectional real-time communication, event handling, and notification delivery.',
+      'A real-time pessimistic locking and concurrency control system built with **Next.js** and **NestJS**, using **WebSockets** for live multi-tab/multi-user synchronization, read-only state enforcement, and instant update broadcasting.',
     )
     .setVersion('1.0')
     .setContact('Vadim', 'https://github.com/thekinv21', 'thekinv21@gmail.com')
