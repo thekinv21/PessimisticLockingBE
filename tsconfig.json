@@ -20,7 +20,8 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/prisma/generated/*": ["./prisma/generated/prisma/*"]
     }
   }
 }
