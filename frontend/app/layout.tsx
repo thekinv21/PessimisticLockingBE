@@ -1,26 +1,49 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Golos_Text, JetBrains_Mono, Manrope } from 'next/font/google'
 
 import { Providers } from '@/app/providers'
 
 import './globals.css'
 
-const inter = Inter({
-	variable: '--font-inter',
-	subsets: ['latin'],
+const manrope = Manrope({
+	variable: '--font-manrope',
+	subsets: ['latin', 'cyrillic'],
+	weight: ['500', '600', '700', '800'],
+})
+
+const golos = Golos_Text({
+	variable: '--font-golos',
+	subsets: ['latin', 'cyrillic'],
+	weight: ['400', '500', '600', '700'],
+})
+
+const jetbrainsMono = JetBrains_Mono({
+	variable: '--font-jetbrains',
+	subsets: ['latin', 'cyrillic'],
+	weight: ['500', '600'],
 })
 
 export const metadata: Metadata = {
-	title: 'Real-Time Notifications',
-	description:
-		'A real-time notification system built with Next.js 16, NestJS 11, and WebSockets.',
+	title: {
+		default: 'WebSocket Realtime',
+		template: '%s · WebSocket Realtime',
+	},
+	description: 'WebSocket Realtime — realtime notifications',
 }
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+type TRootLayoutProps = LayoutProps<'/'>
+
+export default async function RootLayout({ children }: TRootLayoutProps) {
 	return (
-		<html lang='en' className={`${inter.variable} h-full antialiased`}>
-			<body className='min-h-full flex flex-col' suppressHydrationWarning>
-				<Providers>{children}</Providers>
+		<html
+			lang={'en'}
+			className={`${manrope.variable} ${golos.variable} ${jetbrainsMono.variable} h-full`}
+			suppressHydrationWarning
+		>
+			<body className='min-h-full' suppressHydrationWarning>
+				<>
+					<Providers>{children}</Providers>
+				</>
 			</body>
 		</html>
 	)
