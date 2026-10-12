@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 
-import { Auth } from '@/shared/decorators';
+import { Auth } from '@/module/auth/decorators';
 
 import { PostService } from './PostService';
 

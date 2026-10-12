@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 
 import { Role } from '@/shared/constants';
-import { Auth, CurrentUser, Endpoint, PreAuthorize } from '@/shared/decorators';
+import { Endpoint } from '@/shared/decorators';
 import {
   FindIsActiveQueryDto,
   IdParamDto,
@@ -20,6 +20,8 @@ import {
   QueryDto,
 } from '@/shared/dto';
 import type { TCurrentUser } from '@/shared/types';
+
+import { Auth, CurrentUser, PreAuthorize } from '@/module/auth/decorators';
 
 import { CreateUserDto, UpdateUserDto } from './dto/request';
 import { UserDto } from './dto/response';

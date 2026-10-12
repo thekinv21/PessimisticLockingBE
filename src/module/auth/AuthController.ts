@@ -1,9 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
 
 import { RateLimitPreset } from '@/shared/constants';
-import { Auth, CurrentUser, Endpoint, RateLimit } from '@/shared/decorators';
+import { Endpoint, RateLimit } from '@/shared/decorators';
 
 import { AuthService } from './AuthService';
+import { Auth, CurrentUser } from './decorators';
 import { LoginDto, RefreshTokenDto, RegisterDto } from './dto/request';
 import { AuthDto } from './dto/response';
 

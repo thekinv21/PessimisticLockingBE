@@ -1,6 +1,6 @@
 import { CustomDecorator, SetMetadata } from '@nestjs/common';
 
-import { Role } from '../constants';
+import { Role } from '@/shared/constants';
 
 export type TRoleName = (typeof Role)[keyof typeof Role];
 

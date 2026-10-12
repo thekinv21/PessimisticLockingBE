@@ -2,7 +2,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 import type { Request } from 'express';
 
-import type { TCurrentUser } from '../types';
+import type { TCurrentUser } from '@/shared/types';
 
 export const CurrentUser = createParamDecorator(
   (field: keyof TCurrentUser | undefined, ctx: ExecutionContext) => {

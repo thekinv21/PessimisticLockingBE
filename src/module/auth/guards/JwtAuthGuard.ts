@@ -10,7 +10,7 @@ import type { Request } from 'express';
 import { PrismaService } from '@/shared/prisma';
 import type { TCurrentUser, TJwtPayload } from '@/shared/types';
 
-import { JwtTokenService } from '@/module/auth/jwt';
+import { JwtTokenService } from '../jwt';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
