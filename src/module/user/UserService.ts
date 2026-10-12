@@ -13,7 +13,8 @@ import { FindIsActiveQueryDto, PageDto, QueryDto } from '@/shared/dto';
 import { PrismaService } from '@/shared/prisma';
 import { TCurrentUser } from '@/shared/types';
 
-import type { Prisma } from '../../../prisma/generated/prisma/client';
+import type { Prisma } from '@/prisma/generated/client';
+
 import { CreateUserDto, UpdateUserDto } from './dto/request';
 import { UserDto } from './dto/response';
 
@@ -257,7 +258,10 @@ export class UserService {
 
     const { count } = await this.prisma.user.updateMany({
       where: { id, isActive: existing.isActive },
-      data: { isActive: !existing.isActive, tokenVersion: { increment: 1 } },
+      data: {
+        isActive: !existing.isActive,
+        tokenVersion: { increment: 1 },
+      },
     });
 
     if (!count) {

@@ -13,7 +13,7 @@ import type { TCurrentUser } from '@/shared/types';
 import { CreateRoleDto, UpdateRoleDto } from './dto/request';
 import { RoleDto } from './dto/response';
 
-type TActor = Pick<TCurrentUser, 'roles'>;
+type TActor = Pick<TCurrentUser, 'sub' | 'roles'>;
 
 @Injectable()
 export class RoleService {

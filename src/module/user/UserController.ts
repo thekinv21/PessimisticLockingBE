@@ -41,7 +41,7 @@ export class UserController {
   async findAll(
     @Query() query: FindIsActiveQueryDto,
     @CurrentUser() actor: TCurrentUser,
-  ): Promise<UserDto[] | undefined> {
+  ): Promise<UserDto[]> {
     return this.userService.findAll(query, actor);
   }
 
@@ -56,7 +56,7 @@ export class UserController {
   async findByPagination(
     @Query() query: QueryDto,
     @CurrentUser() actor: TCurrentUser,
-  ): Promise<PageDto<UserDto> | undefined> {
+  ): Promise<PageDto<UserDto>> {
     return this.userService.findByPagination(query, actor);
   }
 
@@ -69,7 +69,7 @@ export class UserController {
   async findByUnique(
     @Param() { id }: IdParamDto,
     @CurrentUser() actor: TCurrentUser,
-  ): Promise<UserDto | undefined> {
+  ): Promise<UserDto> {
     return this.userService.findByUnique(id, actor);
   }
 
@@ -78,9 +78,7 @@ export class UserController {
     summary: 'Get current user profile',
     type: UserDto,
   })
-  async findUserProfile(
-    @CurrentUser() actor: TCurrentUser,
-  ): Promise<UserDto | undefined> {
+  async findUserProfile(@CurrentUser() actor: TCurrentUser): Promise<UserDto> {
     return this.userService.findByUnique(actor.sub, actor);
   }
 
