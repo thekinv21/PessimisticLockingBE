@@ -169,7 +169,6 @@ export class AuthService {
     const tokens = await this.jwtTokenService.generateTokens({
       tokenVersion,
       sub: user.id,
-      fullName: user.fullName,
       roles: user.roles.map(({ name }) => name),
     } satisfies TJwtPayload);
 

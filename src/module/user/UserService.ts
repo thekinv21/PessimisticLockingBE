@@ -19,7 +19,10 @@ import { UserDto } from './dto/response';
 
 type TActor = Pick<TJwtPayload, 'sub' | 'roles'>;
 
-type TCreateAccount = Omit<CreateUserDto, 'roles'> & { roleIds: string[] };
+type TCreateAccount = Omit<CreateUserDto, 'roles'> & {
+  roleIds: string[];
+  assignedBy?: string;
+};
 
 @Injectable()
 export class UserService {
@@ -146,7 +149,11 @@ export class UserService {
 
     await this.assertCanAssignRoles(actor, roles);
 
-    await this.createAccount({ ...data, roleIds: roles.map(({ id }) => id) });
+    await this.createAccount({
+      ...data,
+      roleIds: roles.map(({ id }) => id),
+      assignedBy: actor.sub,
+    });
   }
 
   /**
@@ -156,7 +163,8 @@ export class UserService {
    */
 
   async createAccount(data: TCreateAccount): Promise<void> {
-    const { fullName, email, avatar, isActive, password, roleIds } = data;
+    const { fullName, email, avatar, isActive, password, roleIds, assignedBy } =
+      data;
 
     const existing = await this.prisma.user.findUnique({
       where: { email },
@@ -173,7 +181,10 @@ export class UserService {
         isActive,
         avatar,
         roles: {
-          create: [...new Set(roleIds)].map((roleId) => ({ roleId })),
+          create: [...new Set(roleIds)].map((roleId) => ({
+            roleId,
+            assignedBy,
+          })),
         },
       },
     });
@@ -224,7 +235,10 @@ export class UserService {
         tokenVersion: { increment: 1 },
         roles: roles && {
           deleteMany: {},
-          create: roles.map(({ id: roleId }) => ({ roleId })),
+          create: roles.map(({ id: roleId }) => ({
+            roleId,
+            assignedBy: actor.sub,
+          })),
         },
       },
     });

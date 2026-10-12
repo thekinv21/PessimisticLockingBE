@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { DEFAULT_THROTTLER } from '@/shared/constants';
+import { AuditLogInterceptor } from '@/shared/interceptors';
 import { PrismaModule } from '@/shared/prisma/PrismaModule';
 
 import { validateEnv } from '@/config';
@@ -35,6 +36,7 @@ import { UserModule } from './user/UserModule';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],
 })
 export class AppModule {}
