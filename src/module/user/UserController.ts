@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 
@@ -96,7 +97,7 @@ export class UserController {
     await this.userService.create(dto, actor);
   }
 
-  @Patch('/:id')
+  @Put('/:id')
   @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Update a user',

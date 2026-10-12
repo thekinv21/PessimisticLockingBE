@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 
@@ -81,7 +82,7 @@ export class RoleController {
     await this.roleService.create(body);
   }
 
-  @Patch('/:id')
+  @Put('/:id')
   @Endpoint({
     summary: 'Update an existing role',
     description:

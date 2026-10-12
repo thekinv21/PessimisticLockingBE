@@ -5,8 +5,8 @@ import {
   Get,
   HttpStatus,
   Param,
-  Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 
@@ -52,7 +52,7 @@ export class PostController {
     await this.postService.create(dto, actor);
   }
 
-  @Patch('/:id')
+  @Put('/:id')
   @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Update a post',
