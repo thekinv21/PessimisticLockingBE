@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 
 import { Role } from '@/shared/constants';
-import { Auth, Endpoint, PreAuthorize } from '@/shared/decorators';
+import { Auth, CurrentUser, Endpoint, PreAuthorize } from '@/shared/decorators';
 import {
   FindIsActiveQueryDto,
   IdParamDto,
@@ -65,6 +65,17 @@ export class UserController {
   })
   async findByUnique(
     @Param() { id }: IdParamDto,
+  ): Promise<UserDto | undefined> {
+    return this.userService.findByUnique(id);
+  }
+
+  @Get('/me')
+  @Endpoint({
+    summary: 'Get current user profile',
+    type: UserDto,
+  })
+  async findUserProfile(
+    @CurrentUser() { id }: IdParamDto,
   ): Promise<UserDto | undefined> {
     return this.userService.findByUnique(id);
   }
