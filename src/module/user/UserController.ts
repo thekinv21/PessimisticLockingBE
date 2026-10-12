@@ -19,6 +19,7 @@ import {
   PageDto,
   QueryDto,
 } from '@/shared/dto';
+import type { TJwtPayload } from '@/shared/types';
 
 import { CreateUserDto, UpdateUserDto } from './dto/request';
 import { UserDto } from './dto/response';
@@ -30,7 +31,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('/find-all')
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Find all users',
     description: 'Returns all users, optionally filtered by active status.',
@@ -39,12 +40,13 @@ export class UserController {
   })
   async findAll(
     @Query() query: FindIsActiveQueryDto,
+    @CurrentUser() actor: TJwtPayload,
   ): Promise<UserDto[] | undefined> {
-    return this.userService.findAll(query);
+    return this.userService.findAll(query, actor);
   }
 
   @Get('/find-by-pagination')
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Find users with pagination',
     description: 'Returns a page of users with pagination meta.',
@@ -53,20 +55,22 @@ export class UserController {
   })
   async findByPagination(
     @Query() query: QueryDto,
+    @CurrentUser() actor: TJwtPayload,
   ): Promise<PageDto<UserDto> | undefined> {
-    return this.userService.findByPagination(query);
+    return this.userService.findByPagination(query, actor);
   }
 
   @Get('/find-by-unique/:id')
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Find a user by id',
     type: UserDto,
   })
   async findByUnique(
     @Param() { id }: IdParamDto,
+    @CurrentUser() actor: TJwtPayload,
   ): Promise<UserDto | undefined> {
-    return this.userService.findByUnique(id);
+    return this.userService.findByUnique(id, actor);
   }
 
   @Get('/me')
@@ -75,42 +79,54 @@ export class UserController {
     type: UserDto,
   })
   async findUserProfile(
-    @CurrentUser() { id }: IdParamDto,
+    @CurrentUser() actor: TJwtPayload,
   ): Promise<UserDto | undefined> {
-    return this.userService.findByUnique(id);
+    return this.userService.findByUnique(actor.sub, actor);
   }
 
   @Post()
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Create a user',
     status: HttpStatus.CREATED,
   })
-  async create(@Body() dto: CreateUserDto): Promise<void> {
-    await this.userService.create(dto);
+  async create(
+    @Body() dto: CreateUserDto,
+    @CurrentUser() actor: TJwtPayload,
+  ): Promise<void> {
+    await this.userService.create(dto, actor);
   }
 
   @Put()
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({ summary: 'Update a user' })
-  async update(@Body() dto: UpdateUserDto): Promise<void> {
-    await this.userService.update(dto);
+  async update(
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() actor: TJwtPayload,
+  ): Promise<void> {
+    await this.userService.update(dto, actor);
   }
 
   @Patch('/toggle/:id')
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Toggle user active status',
     description: 'Switches the user between active and inactive.',
   })
-  async toggle(@Param() { id }: IdParamDto): Promise<void> {
-    await this.userService.toggle(id);
+  async toggle(
+    @Param() { id }: IdParamDto,
+    @CurrentUser() actor: TJwtPayload,
+  ): Promise<void> {
+    await this.userService.toggle(id, actor);
   }
 
   @Delete('/delete/:id')
-  @PreAuthorize(Role.ADMIN)
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({ summary: 'Delete a user' })
-  async delete(@Param() { id }: IdParamDto): Promise<void> {
-    await this.userService.delete(id);
+  async delete(
+    @Param() { id }: IdParamDto,
+    @CurrentUser() actor: TJwtPayload,
+  ): Promise<void> {
+    await this.userService.delete(id, actor);
   }
 }

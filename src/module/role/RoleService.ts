@@ -1,14 +1,19 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 
+import { PROTECTED_ROLES, Role } from '@/shared/constants';
 import { PageDto, QueryDto } from '@/shared/dto';
 import { PrismaService } from '@/shared/prisma';
+import type { TJwtPayload } from '@/shared/types';
 
 import { CreateRoleDto, UpdateRoleDto } from './dto/request';
 import { RoleDto } from './dto/response';
+
+type TActor = Pick<TJwtPayload, 'roles'>;
 
 @Injectable()
 export class RoleService {
@@ -33,11 +38,14 @@ export class RoleService {
    */
 
   async findByPagination(query: QueryDto): Promise<PageDto<RoleDto>> {
-    const { offset, limit, searchTerm, sortBy } = query;
+    const { offset, limit, searchTerm, sortBy, isActive } = query;
 
-    const where = searchTerm
-      ? { name: { contains: searchTerm, mode: 'insensitive' as const } }
-      : {};
+    const where = {
+      isActive,
+      ...(searchTerm && {
+        name: { contains: searchTerm, mode: 'insensitive' as const },
+      }),
+    };
 
     const [roles, total] = await this.prisma.$transaction([
       this.prisma.role.findMany({
@@ -85,30 +93,36 @@ export class RoleService {
 
   /**
    * @param body Role update data
+   * @param actor The signed-in user performing the operation
    * @returns void
+   * @description Only OWNER may deactivate a protected role.
    */
 
-  async update(body: UpdateRoleDto): Promise<void> {
-    const existing: RoleDto = await this.findByUnique(body.id);
+  async update(
+    { id, description, isActive }: UpdateRoleDto,
+    actor: TActor,
+  ): Promise<void> {
+    const existing: RoleDto = await this.findByUnique(id);
+
+    if (isActive === false) this.assertNotProtected(existing, actor);
 
     await this.prisma.role.update({
-      where: { id: body.id },
-      data: {
-        id: existing.id,
-        name: body.name ?? existing.name,
-        description: body.description,
-        isActive: body.isActive ?? existing.isActive,
-      },
+      where: { id },
+      data: { description, isActive },
     });
   }
 
   /**
    * @param id Unique identifier of the role
+   * @param actor The signed-in user performing the operation
    * @returns void
+   * @description Only OWNER may deactivate a protected role.
    */
 
-  async toggle(id: string): Promise<void> {
+  async toggle(id: string, actor: TActor): Promise<void> {
     const existing = await this.findByUnique(id);
+
+    if (existing.isActive) this.assertNotProtected(existing, actor);
 
     await this.prisma.role.update({
       where: { id },
@@ -118,13 +132,16 @@ export class RoleService {
 
   /**
    * @param id Unique identifier of the role
+   * @param actor The signed-in user performing the operation
    * @returns void
    * @description This operation will permanently delete the role from the
-   * system. Use with caution.
+   * system. Use with caution. Only OWNER may delete a protected role.
    */
 
-  async delete(id: string): Promise<void> {
-    await this.findByUnique(id);
+  async delete(id: string, actor: TActor): Promise<void> {
+    const existing = await this.findByUnique(id);
+
+    this.assertNotProtected(existing, actor);
 
     const assignedUserCount: number = await this.prisma.userRoles.count({
       where: { roleId: id },
@@ -137,5 +154,21 @@ export class RoleService {
     }
 
     await this.prisma.role.delete({ where: { id } });
+  }
+
+  /**
+   * @description Throws when a non-owner targets a role the system depends on
+   * (OWNER, ADMIN, USER). Disabling one would lock every admin out or break
+   * registration.
+   */
+
+  private assertNotProtected({ name }: RoleDto, actor: TActor): void {
+    if (actor.roles.includes(Role.OWNER)) return;
+
+    if (PROTECTED_ROLES.includes(name)) {
+      throw new ForbiddenException(
+        `The ${name} role is protected and cannot be deactivated or deleted.`,
+      );
+    }
   }
 }

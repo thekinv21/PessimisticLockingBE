@@ -34,6 +34,10 @@ async function bootstrap() {
   const isProduction: boolean =
     configService.get('NODE_ENV', { infer: true }) === 'production';
 
+  const trustProxy = configService.get('TRUST_PROXY', { infer: true });
+
+  if (trustProxy > 0) app.set('trust proxy', trustProxy);
+
   app.enableCors({
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
     origin: configService.get('CORS_ORIGINS', { infer: true }),

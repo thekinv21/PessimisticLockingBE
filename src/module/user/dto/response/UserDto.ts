@@ -7,7 +7,7 @@ const IsoDateSchema = z.codec(z.iso.datetime(), z.date(), {
 });
 
 export const UserSchema = z.object({
-  id: z.uuid(),
+  id: z.cuid2(),
   fullName: z.string(),
   email: z.email(),
   avatar: z.string().nullable(),
@@ -15,7 +15,7 @@ export const UserSchema = z.object({
   isActive: z.boolean(),
   roles: z.array(
     z.object({
-      id: z.uuid(),
+      id: z.cuid2(),
       name: z.string(),
     }),
   ),

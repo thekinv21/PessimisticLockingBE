@@ -18,7 +18,8 @@
     "prepare": "husky",
     "db:migrate": "bunx --bun prisma migrate dev",
     "db:generate": "bunx --bun prisma generate",
-    "db:studio": "bunx --bun prisma studio"
+    "db:studio": "bunx --bun prisma studio",
+    "db:seed": "bunx --bun prisma db seed"
   },
   "dependencies": {
     "@nestjs/common": "^11",
@@ -28,6 +29,7 @@
     "@nestjs/platform-express": "^11",
     "@nestjs/platform-socket.io": "^11",
     "@nestjs/swagger": "11",
+    "@nestjs/throttler": "^6.7.1",
     "@nestjs/websockets": "^11",
     "@prisma/adapter-pg": "7",
     "@prisma/client": "7",

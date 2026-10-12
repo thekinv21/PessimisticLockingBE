@@ -1,6 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 
-import { Endpoint } from '@/shared/decorators';
+import { RateLimitPreset } from '@/shared/constants';
+import { Auth, CurrentUser, Endpoint, RateLimit } from '@/shared/decorators';
 
 import { AuthService } from './AuthService';
 import { LoginDto, RefreshTokenDto, RegisterDto } from './dto/request';
@@ -11,6 +12,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('/register')
+  @RateLimit(RateLimitPreset.REGISTER)
   @Endpoint({
     summary: 'Register a new user',
     description:
@@ -21,6 +23,7 @@ export class AuthController {
   }
 
   @Post('/login')
+  @RateLimit(RateLimitPreset.LOGIN)
   @Endpoint({
     summary: 'Log in',
     description: 'Returns the user and an access and refresh token pair.',
@@ -31,6 +34,7 @@ export class AuthController {
   }
 
   @Post('/refresh-token')
+  @RateLimit(RateLimitPreset.REFRESH_TOKEN)
   @Endpoint({
     summary: 'Refresh tokens',
     description: 'Swaps a valid refresh token for a new token pair.',
@@ -40,13 +44,14 @@ export class AuthController {
     return this.authService.refresh(dto);
   }
 
-  // @Post('/logout')
-  // @Auth()
-  // @Endpoint({
-  //   summary: 'Log out',
-  //   description: 'Revokes every access and refresh token of the current user.',
-  // })
-  // async logout(@CurrentUser('sub') { id }: IdParamDto): Promise<void> {
-  //   await this.authService.logout(id);
-  // }
+  @Post('/logout')
+  @Auth()
+  @RateLimit(RateLimitPreset.LOGOUT)
+  @Endpoint({
+    summary: 'Log out',
+    description: 'Revokes every access and refresh token of the current user.',
+  })
+  async logout(@CurrentUser('sub') id: string): Promise<void> {
+    await this.authService.logout(id);
+  }
 }

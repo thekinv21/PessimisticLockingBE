@@ -51,11 +51,11 @@ export class AuthService {
 
     const { fullName, email, password } = dto;
 
-    await this.userService.create({
+    await this.userService.createAccount({
       fullName,
       email,
       password,
-      roles: [{ id: role.id }],
+      roleIds: [role.id],
     });
   }
 

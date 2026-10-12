@@ -18,6 +18,7 @@ const urlList = () =>
 export const envSchema = z.looseObject({
   NODE_ENV: z.enum(['development', 'production', 'test']),
   PORT: positiveInt().max(65535),
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   CORS_ORIGINS: urlList(),
   DATABASE_URL: nonEmptyString(),
   JWT_ACCESS_SECRET: nonEmptyString().min(32),
