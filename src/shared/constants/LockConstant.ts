@@ -55,3 +55,10 @@ export const MAX_LOCKS_PER_SOCKET = 10;
 export const LOCK_PING_INTERVAL_MS = 10 * SECOND;
 
 export const LOCK_PING_TIMEOUT_MS = 5 * SECOND;
+
+/**
+ * Per-socket event budget; HTTP throttling does not cover gateways. Every
+ * client event counts, `lock:acquire` costs database reads.
+ */
+
+export const LOCK_RATE_LIMIT = { limit: 30, windowMs: 10 * SECOND } as const;

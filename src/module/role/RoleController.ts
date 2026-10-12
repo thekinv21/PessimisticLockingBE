@@ -3,10 +3,10 @@ import {
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Param,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 
@@ -26,13 +26,29 @@ import { CreateRoleDto, UpdateRoleDto } from './dto/request';
 import { RoleDto } from './dto/response';
 import { RoleService } from './RoleService';
 
-@Controller('roles')
+/**
+ * Static routes (/all) are declared before /:id so they are matched first.
+ */
+
+@Controller('/roles')
 @Auth()
+@PreAuthorize(Role.OWNER, Role.ADMIN)
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 
-  @Get('/find-all')
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
+  @Get()
+  @Endpoint({
+    summary: 'Get roles with pagination',
+    description:
+      'This operation will retrieve roles with pagination support and an optional search term.',
+    type: RoleDto,
+    isPaginated: true,
+  })
+  async findByPagination(@Query() query: QueryDto): Promise<PageDto<RoleDto>> {
+    return this.roleService.findByPagination(query);
+  }
+
+  @Get('/all')
   @Endpoint({
     summary: 'Get all roles',
     description: 'This operation will retrieve all roles in the system.',
@@ -43,60 +59,43 @@ export class RoleController {
     return this.roleService.findAll(query.isActive);
   }
 
-  @Get('/find-by-pagination')
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
-  @Endpoint({
-    summary: 'Get roles with pagination',
-    description:
-      'This operation will retrieve roles with pagination support and an optional search term.',
-    type: RoleDto,
-    isArray: true,
-    isPaginated: true,
-  })
-  async findByPagination(@Query() query: QueryDto): Promise<PageDto<RoleDto>> {
-    return this.roleService.findByPagination(query);
-  }
-
-  @Get('/find-by-unique/:id')
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
+  @Get('/:id')
   @Endpoint({
     summary: 'Get role by unique identifier',
     description:
       'This operation will retrieve a role based on its unique identifier.',
     type: RoleDto,
-    isArray: false,
   })
   async findByUnique(@Param() { id }: IdParamDto): Promise<RoleDto> {
     return this.roleService.findByUnique(id);
   }
 
   @Post()
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Create a new role',
     description:
-      'This operation will create a new role in the system. You need to provide a unique name and an optional description for the role.',
+      'This operation will create a new role in the system. You need to provide a unique name and a description for the role.',
+    status: HttpStatus.CREATED,
   })
   async create(@Body() body: CreateRoleDto): Promise<void> {
     await this.roleService.create(body);
   }
 
-  @Put()
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
+  @Patch('/:id')
   @Endpoint({
     summary: 'Update an existing role',
     description:
       "This operation will update the details of an existing role. You can modify the role's description and active status; the name cannot change.",
   })
   async update(
+    @Param() { id }: IdParamDto,
     @Body() body: UpdateRoleDto,
     @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
-    await this.roleService.update(body, actor);
+    await this.roleService.update(id, body, actor);
   }
 
-  @Patch('/toggle/:id')
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
+  @Patch('/:id/toggle')
   @Endpoint({
     summary: 'Toggle role active status',
     description:
@@ -109,8 +108,7 @@ export class RoleController {
     await this.roleService.toggle(id, actor);
   }
 
-  @Delete('/delete/:id')
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
+  @Delete('/:id')
   @Endpoint({
     summary: 'Delete a role',
     description:

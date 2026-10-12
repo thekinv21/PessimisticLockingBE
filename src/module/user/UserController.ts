@@ -7,7 +7,6 @@ import {
   Param,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 
@@ -32,22 +31,7 @@ import { UserService } from './UserService';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get('/find-all')
-  @PreAuthorize(Role.OWNER, Role.ADMIN)
-  @Endpoint({
-    summary: 'Find all users',
-    description: 'Returns all users, optionally filtered by active status.',
-    type: UserDto,
-    isArray: true,
-  })
-  async findAll(
-    @Query() query: FindIsActiveQueryDto,
-    @CurrentUser() actor: TCurrentUser,
-  ): Promise<UserDto[]> {
-    return this.userService.findAll(query, actor);
-  }
-
-  @Get('/find-by-pagination')
+  @Get()
   @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Find users with pagination',
@@ -62,7 +46,31 @@ export class UserController {
     return this.userService.findByPagination(query, actor);
   }
 
-  @Get('/find-by-unique/:id')
+  @Get('/all')
+  @PreAuthorize(Role.OWNER, Role.ADMIN)
+  @Endpoint({
+    summary: 'Find all users',
+    description: 'Returns all users, optionally filtered by active status.',
+    type: UserDto,
+    isArray: true,
+  })
+  async findAll(
+    @Query() query: FindIsActiveQueryDto,
+    @CurrentUser() actor: TCurrentUser,
+  ): Promise<UserDto[]> {
+    return this.userService.findAll(query, actor);
+  }
+
+  @Get('/me')
+  @Endpoint({
+    summary: 'Get current user profile',
+    type: UserDto,
+  })
+  async findUserProfile(@CurrentUser() actor: TCurrentUser): Promise<UserDto> {
+    return this.userService.findByUnique(actor.sub, actor);
+  }
+
+  @Get('/:id')
   @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Find a user by id',
@@ -73,15 +81,6 @@ export class UserController {
     @CurrentUser() actor: TCurrentUser,
   ): Promise<UserDto> {
     return this.userService.findByUnique(id, actor);
-  }
-
-  @Get('/me')
-  @Endpoint({
-    summary: 'Get current user profile',
-    type: UserDto,
-  })
-  async findUserProfile(@CurrentUser() actor: TCurrentUser): Promise<UserDto> {
-    return this.userService.findByUnique(actor.sub, actor);
   }
 
   @Post()
@@ -97,17 +96,22 @@ export class UserController {
     await this.userService.create(dto, actor);
   }
 
-  @Put()
+  @Patch('/:id')
   @PreAuthorize(Role.OWNER, Role.ADMIN)
-  @Endpoint({ summary: 'Update a user' })
+  @Endpoint({
+    summary: 'Update a user',
+    description:
+      'Only the given fields change. When roles is provided the roles are replaced.',
+  })
   async update(
+    @Param() { id }: IdParamDto,
     @Body() dto: UpdateUserDto,
     @CurrentUser() actor: TCurrentUser,
   ): Promise<void> {
-    await this.userService.update(dto, actor);
+    await this.userService.update(id, dto, actor);
   }
 
-  @Patch('/toggle/:id')
+  @Patch('/:id/toggle')
   @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({
     summary: 'Toggle user active status',
@@ -120,7 +124,7 @@ export class UserController {
     await this.userService.toggle(id, actor);
   }
 
-  @Delete('/delete/:id')
+  @Delete('/:id')
   @PreAuthorize(Role.OWNER, Role.ADMIN)
   @Endpoint({ summary: 'Delete a user' })
   async delete(

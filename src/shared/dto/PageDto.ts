@@ -13,6 +13,14 @@ export class PageDto<T> {
     return new PageDto(items, total, query);
   }
 
+  /**
+   * @returns The same page with its items replaced, e.g. serialized
+   */
+
+  mapItems<U>(fn: (items: T[]) => U[]): PageDto<U> {
+    return new PageDto(fn(this.items), this.total, this.query);
+  }
+
   get meta(): TPaginationMeta {
     const { offset, limit } = this.query;
 

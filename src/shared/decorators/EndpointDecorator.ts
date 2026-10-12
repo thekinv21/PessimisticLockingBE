@@ -1,10 +1,21 @@
-import { applyDecorators, HttpStatus, Type, Version } from '@nestjs/common';
+import {
+  applyDecorators,
+  HttpCode,
+  HttpStatus,
+  Type,
+  Version,
+} from '@nestjs/common';
 import {
   ApiExtraModels,
   ApiOperation,
   ApiResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
+
+import { type ZodDto, ZodSerializerDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+import { PageDto } from '../dto/PageDto';
 
 type TApiEndpointOptions = {
   version?: string;
@@ -29,6 +40,34 @@ const PAGINATION_META_SCHEMA = {
     hasPrevious: { type: 'boolean', example: false },
   },
 };
+
+const isZodDto = (type: Type<unknown>): type is Type<unknown> & ZodDto =>
+  (type as Partial<ZodDto>).isZodDto === true;
+
+/**
+ * Response serializer for the endpoint: fields missing from the DTO schema
+ * are stripped, codec DTOs are encoded (e.g. Date -> ISO string). A PageDto
+ * keeps its meta and only its items are serialized.
+ */
+
+function serializerFor(dto: ZodDto, list: boolean, isPaginated: boolean) {
+  if (!list) return ZodSerializerDto(dto);
+
+  const items = z.array(dto.schema as z.ZodType);
+
+  const serializeItems = (value: unknown[]): unknown[] =>
+    dto.codec ? items.encode(value) : items.parse(value);
+
+  if (!isPaginated) {
+    return ZodSerializerDto(z.array(z.unknown()).transform(serializeItems));
+  }
+
+  return ZodSerializerDto(
+    z
+      .custom<PageDto<unknown>>((value) => value instanceof PageDto)
+      .transform((page) => page.mapItems(serializeItems)),
+  );
+}
 
 export function Endpoint(params: TApiEndpointOptions) {
   const {
@@ -55,6 +94,14 @@ export function Endpoint(params: TApiEndpointOptions) {
      * API VERSION
      */
     Version(version),
+
+    /**
+     * Actual status code; also documented below so the two cannot drift
+     */
+
+    HttpCode(status),
+
+    ...(type && isZodDto(type) ? [serializerFor(type, list, isPaginated)] : []),
 
     /**
      * Swagger UI API title and description

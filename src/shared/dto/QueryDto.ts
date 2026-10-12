@@ -6,7 +6,7 @@ const QuerySchema = z.object({
 
   limit: z.coerce.number().int().min(1).max(100).default(10),
 
-  searchTerm: z.string().trim().optional(),
+  searchTerm: z.string().trim().max(100).optional(),
 
   sortBy: z.enum(['asc', 'desc']).optional(),
 

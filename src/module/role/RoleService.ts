@@ -92,6 +92,7 @@ export class RoleService {
   }
 
   /**
+   * @param id Unique identifier of the role
    * @param body Role update data
    * @param actor The signed-in user performing the operation
    * @returns void
@@ -99,7 +100,8 @@ export class RoleService {
    */
 
   async update(
-    { id, description, isActive }: UpdateRoleDto,
+    id: string,
+    { description, isActive }: UpdateRoleDto,
     actor: TActor,
   ): Promise<void> {
     const existing: RoleDto = await this.findByUnique(id);

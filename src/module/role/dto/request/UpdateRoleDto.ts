@@ -7,7 +7,6 @@ import { z } from 'zod';
  */
 
 const UpdateRoleSchema = z.strictObject({
-  id: z.cuid2(),
   description: z.string().max(255).optional(),
   isActive: z.boolean().optional(),
 });

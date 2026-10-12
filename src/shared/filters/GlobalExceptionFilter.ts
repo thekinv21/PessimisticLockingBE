@@ -12,7 +12,8 @@ import {
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 
-import { Prisma } from '../../../prisma/generated/prisma/client';
+import { Prisma } from '@/prisma/generated/client';
+
 import type { TApiErrorDetail, TApiErrorResponse } from '../types';
 
 const VALIDATION_MESSAGE = 'Validation failed';
@@ -25,6 +26,8 @@ const INTERNAL_MESSAGE = 'Internal server error';
 
 const PRISMA_ERRORS: Record<string, () => HttpException> = {
   P2002: () => new ConflictException('Resource already exists'),
+  P2003: () =>
+    new ConflictException('Referenced resource is missing or still in use'),
   P2025: () => new NotFoundException('Resource not found'),
 };
 

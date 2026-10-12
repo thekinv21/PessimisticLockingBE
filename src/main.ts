@@ -1,4 +1,4 @@
-import { Logger, VersioningType } from '@nestjs/common';
+import { ConsoleLogger, Logger, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -7,11 +7,18 @@ import { SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 
-import { createSwaggerConfig, TEnv } from '@/config';
+import { createSwaggerConfig, env, TEnv } from '@/config';
 import { AppModule } from '@/module/AppModule';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  /**
+   * JSON lines in production so log collectors can parse them; colored
+   * text in development.
+   */
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new ConsoleLogger({ json: env.NODE_ENV === 'production' }),
+  });
 
   app.disable('x-powered-by');
 
@@ -58,4 +65,7 @@ async function bootstrap() {
     Logger.debug(`Swagger UI running on host: http://localhost:${port}/docs`);
   }
 }
-void bootstrap();
+bootstrap().catch((error: unknown) => {
+  Logger.error(error, 'Bootstrap');
+  process.exit(1);
+});

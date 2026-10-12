@@ -199,6 +199,16 @@ export class LockService implements OnModuleDestroy {
     action: TRecordChangeAction,
     write: () => Promise<T>,
   ): Promise<T> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: actor.sub },
+      select: { fullName: true },
+    });
+
+    /**
+     * No await between the lock check and starting the write, so a lock
+     * taken while the name was loading is still seen.
+     */
+
     const lock = this.locks.get(this.keyOf(target));
 
     if (lock && lock.holder.userId !== actor.sub) {
@@ -207,11 +217,6 @@ export class LockService implements OnModuleDestroy {
         HttpStatus.LOCKED,
       );
     }
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: actor.sub },
-      select: { fullName: true },
-    });
 
     const result = await write();
 

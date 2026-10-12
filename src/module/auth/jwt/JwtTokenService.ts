@@ -5,8 +5,11 @@ import { JwtService } from '@nestjs/jwt';
 
 import type { TJwtPayload } from '@/shared/types';
 
+import type { TEnv } from '@/config';
+
 const ALGORITHM = 'HS256';
-const MIN_SECRET_LENGTH = 32;
+const ISSUER = 'websocket-realtime-notifications';
+const AUDIENCE = 'websocket-realtime-notifications-client';
 
 type TExpiresIn = JwtSignOptions['expiresIn'];
 
@@ -26,32 +29,25 @@ export class JwtTokenService {
 
   constructor(
     private readonly jwtService: JwtService,
-    configService: ConfigService,
+    configService: ConfigService<TEnv, true>,
   ) {
-    this.accessSecret = configService.getOrThrow<string>('JWT_ACCESS_SECRET');
+    /**
+     * Length and distinctness of the secrets are enforced by the env schema.
+     */
 
-    this.refreshSecret = configService.getOrThrow<string>('JWT_REFRESH_SECRET');
+    this.accessSecret = configService.get('JWT_ACCESS_SECRET', { infer: true });
 
-    if (
-      this.accessSecret.length < MIN_SECRET_LENGTH ||
-      this.refreshSecret.length < MIN_SECRET_LENGTH
-    ) {
-      throw new Error(
-        `JWT secrets must be at least ${MIN_SECRET_LENGTH} characters long`,
-      );
-    }
+    this.refreshSecret = configService.get('JWT_REFRESH_SECRET', {
+      infer: true,
+    });
 
-    if (this.accessSecret === this.refreshSecret) {
-      throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ');
-    }
+    this.accessExpiresIn = configService.get('JWT_ACCESS_EXPIRES_IN', {
+      infer: true,
+    }) as TExpiresIn;
 
-    this.accessExpiresIn = configService.getOrThrow<string>(
-      'JWT_ACCESS_EXPIRES_IN',
-    ) as TExpiresIn;
-
-    this.refreshExpiresIn = configService.getOrThrow<string>(
-      'JWT_REFRESH_EXPIRES_IN',
-    ) as TExpiresIn;
+    this.refreshExpiresIn = configService.get('JWT_REFRESH_EXPIRES_IN', {
+      infer: true,
+    }) as TExpiresIn;
   }
 
   /**
@@ -101,7 +97,13 @@ export class JwtTokenService {
   ): Promise<string> {
     return this.jwtService.signAsync(
       { sub, tokenVersion },
-      { algorithm: ALGORITHM, secret, expiresIn, noTimestamp: true },
+      {
+        algorithm: ALGORITHM,
+        secret,
+        expiresIn,
+        issuer: ISSUER,
+        audience: AUDIENCE,
+      },
     );
   }
 
@@ -115,7 +117,12 @@ export class JwtTokenService {
   private async verify(token: string, secret: string): Promise<TJwtPayload> {
     const { sub, tokenVersion } = await this.jwtService.verifyAsync<
       Partial<TJwtPayload>
-    >(token, { algorithms: [ALGORITHM], secret });
+    >(token, {
+      algorithms: [ALGORITHM],
+      secret,
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
 
     if (typeof sub !== 'string' || typeof tokenVersion !== 'number') {
       throw new Error('Invalid token claims');

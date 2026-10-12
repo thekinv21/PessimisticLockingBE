@@ -13,11 +13,17 @@ export const RoleRefsSchema = z
     'Roles must be unique',
   );
 
+/**
+ * Only http(s) URLs, so a stored avatar can never be a `javascript:` link.
+ */
+
+export const AvatarSchema = z.url({ protocol: /^https?$/ }).max(2048);
+
 export const CreateUserSchema = z.strictObject({
   fullName: z.string().trim().min(1).max(100),
   email: z.email().trim().toLowerCase(),
   password: z.string().min(8).max(72),
-  avatar: z.string().max(2048).optional(),
+  avatar: AvatarSchema.optional(),
   isActive: z.boolean().optional(),
   roles: RoleRefsSchema,
 });

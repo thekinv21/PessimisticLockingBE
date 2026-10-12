@@ -7,16 +7,19 @@ import {
 
 import type { Request } from 'express';
 
-import { PrismaService } from '@/shared/prisma';
 import type { TCurrentUser, TJwtPayload } from '@/shared/types';
 
 import { JwtTokenService } from '../jwt';
+import { SessionService } from '../session';
+
+const INVALID_TOKEN =
+  'The access token is invalid or has expired. Please provide a valid access token.';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtTokenService: JwtTokenService,
-    private readonly prisma: PrismaService,
+    private readonly sessionService: SessionService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,38 +41,14 @@ export class JwtAuthGuard implements CanActivate {
     try {
       payload = await this.jwtTokenService.verifyAccessToken(token);
     } catch {
-      throw new UnauthorizedException(
-        'The access token is invalid or has expired. Please provide a valid access token.',
-      );
+      throw new UnauthorizedException(INVALID_TOKEN);
     }
 
-    /**
-     * Verify token version matches current user token version and read the
-     * roles from the database so role changes apply immediately
-     */
+    const session = await this.sessionService.load(payload);
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        tokenVersion: true,
-        isActive: true,
-        roles: {
-          where: { role: { isActive: true } },
-          select: { role: { select: { name: true } } },
-        },
-      },
-    });
+    if (!session) throw new UnauthorizedException(INVALID_TOKEN);
 
-    if (!user || !user.isActive || user.tokenVersion !== payload.tokenVersion) {
-      throw new UnauthorizedException(
-        'The access token is invalid or has expired. Please provide a valid access token.',
-      );
-    }
-
-    request.user = {
-      sub: payload.sub,
-      roles: user.roles.map(({ role }) => role.name),
-    };
+    request.user = { sub: session.userId, roles: session.roles };
 
     return true;
   }

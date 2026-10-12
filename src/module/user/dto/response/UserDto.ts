@@ -1,17 +1,13 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-const IsoDateSchema = z.codec(z.iso.datetime(), z.date(), {
-  decode: (value) => new Date(value),
-  encode: (value) => value.toISOString(),
-});
+import { IsoDateSchema } from '@/shared/schemas';
 
 export const UserSchema = z.object({
   id: z.cuid2(),
   fullName: z.string(),
   email: z.email(),
   avatar: z.string().nullable(),
-  tokenVersion: z.number().optional(),
   isActive: z.boolean(),
   roles: z.array(
     z.object({
@@ -23,4 +19,4 @@ export const UserSchema = z.object({
   updatedAt: IsoDateSchema.optional(),
 });
 
-export class UserDto extends createZodDto(UserSchema) {}
+export class UserDto extends createZodDto(UserSchema, { codec: true }) {}

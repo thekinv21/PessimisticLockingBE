@@ -8,4 +8,5 @@ model UserRoles {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
+  @@index([roleId])
 }

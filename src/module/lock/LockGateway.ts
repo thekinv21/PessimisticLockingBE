@@ -15,12 +15,14 @@ import {
   LOCK_NAMESPACE,
   LOCK_PING_INTERVAL_MS,
   LOCK_PING_TIMEOUT_MS,
+  LOCK_RATE_LIMIT,
   LockEvent,
 } from '@/shared/constants';
-import { PrismaService } from '@/shared/prisma';
+import type { TJwtPayload } from '@/shared/types';
 
 import { env } from '@/config';
 import { JwtTokenService } from '@/module/auth/jwt';
+import { SessionService } from '@/module/auth/session';
 
 import { LockTargetSchema, LockWatchSchema } from './LockSchema';
 import { LockService } from './LockService';
@@ -36,6 +38,13 @@ const INVALID_PAYLOAD: TLockAck<never> = {
   error: 'Invalid payload.',
 };
 
+const RATE_LIMITED: TLockAck<never> = {
+  ok: false,
+  error: 'Too many requests. Please slow down.',
+};
+
+type TRateWindow = { count: number; resetAt: number };
+
 /**
  * Edit lock events. Clients connect to the `/locks` namespace with
  * `auth: { token: <access token> }`. Global guards, pipes and interceptors do
@@ -49,10 +58,12 @@ const INVALID_PAYLOAD: TLockAck<never> = {
   pingTimeout: LOCK_PING_TIMEOUT_MS,
 })
 export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
+  private readonly rateWindows = new Map<string, TRateWindow>();
+
   constructor(
     private readonly lockService: LockService,
     private readonly jwtTokenService: JwtTokenService,
-    private readonly prisma: PrismaService,
+    private readonly sessionService: SessionService,
   ) {}
 
   afterInit(server: Namespace): void {
@@ -67,6 +78,7 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   handleDisconnect(socket: TLockSocket): void {
+    this.rateWindows.delete(socket.id);
     this.lockService.releaseAll(socket.id, 'disconnected');
   }
 
@@ -80,6 +92,8 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
     @ConnectedSocket() socket: TLockSocket,
     @MessageBody() body: unknown,
   ): Promise<TLockAck<TEditLock[]>> {
+    if (!this.allow(socket)) return RATE_LIMITED;
+
     const payload = this.parse(LockWatchSchema, body);
 
     if (!payload) return INVALID_PAYLOAD;
@@ -94,6 +108,8 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
     @ConnectedSocket() socket: TLockSocket,
     @MessageBody() body: unknown,
   ): Promise<TLockAck> {
+    if (!this.allow(socket)) return RATE_LIMITED;
+
     const payload = this.parse(LockWatchSchema, body);
 
     if (!payload) return INVALID_PAYLOAD;
@@ -113,14 +129,16 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
     @ConnectedSocket() socket: TLockSocket,
     @MessageBody() body: unknown,
   ): Promise<TLockAck<TEditLock>> {
+    if (!this.allow(socket)) return RATE_LIMITED;
+
     const payload = this.parse(LockTargetSchema, body);
 
     if (!payload) return INVALID_PAYLOAD;
 
-    const session = await this.loadSession(
-      socket.data.userId,
-      socket.data.tokenVersion,
-    );
+    const session = await this.loadSession({
+      sub: socket.data.userId,
+      tokenVersion: socket.data.tokenVersion,
+    });
 
     if (!session) {
       socket.disconnect(true);
@@ -138,6 +156,8 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
     @ConnectedSocket() socket: TLockSocket,
     @MessageBody() body: unknown,
   ): TLockAck<TEditLock> {
+    if (!this.allow(socket)) return RATE_LIMITED;
+
     const payload = this.parse(LockTargetSchema, body);
 
     if (!payload) return INVALID_PAYLOAD;
@@ -155,6 +175,8 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
     @ConnectedSocket() socket: TLockSocket,
     @MessageBody() body: unknown,
   ): TLockAck {
+    if (!this.allow(socket)) return RATE_LIMITED;
+
     const payload = this.parse(LockTargetSchema, body);
 
     if (!payload) return INVALID_PAYLOAD;
@@ -172,11 +194,11 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     if (typeof token !== 'string' || !token) throw new Error('Missing token');
 
-    const { sub, tokenVersion } = await this.jwtTokenService.verifyAccessToken(
+    const payload = await this.jwtTokenService.verifyAccessToken(
       token.replace(/^Bearer /, ''),
     );
 
-    const session = await this.loadSession(sub, tokenVersion);
+    const session = await this.loadSession(payload);
 
     if (!session) throw new Error('Session is not allowed');
 
@@ -184,36 +206,42 @@ export class LockGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   /**
-   * @returns null when the user is missing, inactive, has a revoked token or
-   * holds none of the LOCK_ALLOWED_ROLES
+   * @returns null when the session is revoked or holds none of the
+   * LOCK_ALLOWED_ROLES
    */
 
   private async loadSession(
-    sub: string,
-    tokenVersion: number,
+    payload: TJwtPayload,
   ): Promise<TLockSession | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: sub },
-      select: {
-        fullName: true,
-        tokenVersion: true,
-        isActive: true,
-        roles: {
-          where: { role: { isActive: true } },
-          select: { role: { select: { name: true } } },
-        },
-      },
-    });
+    const session = await this.sessionService.load(payload);
 
-    if (!user || !user.isActive || user.tokenVersion !== tokenVersion) {
+    if (!session?.roles.some((role) => LOCK_ALLOWED_ROLES.includes(role))) {
       return null;
     }
 
-    const roles = user.roles.map(({ role }) => role.name);
+    return session;
+  }
 
-    if (!roles.some((role) => LOCK_ALLOWED_ROLES.includes(role))) return null;
+  /**
+   * @description Fixed-window counter per socket; see LOCK_RATE_LIMIT.
+   */
 
-    return { userId: sub, fullName: user.fullName, roles, tokenVersion };
+  private allow(socket: TLockSocket): boolean {
+    const now = Date.now();
+    const window = this.rateWindows.get(socket.id);
+
+    if (!window || window.resetAt <= now) {
+      this.rateWindows.set(socket.id, {
+        count: 1,
+        resetAt: now + LOCK_RATE_LIMIT.windowMs,
+      });
+
+      return true;
+    }
+
+    window.count += 1;
+
+    return window.count <= LOCK_RATE_LIMIT.limit;
   }
 
   private parse<T>(schema: z.ZodType<T>, body: unknown): T | null {

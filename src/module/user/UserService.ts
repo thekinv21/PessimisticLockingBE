@@ -25,6 +25,25 @@ type TCreateAccount = Omit<CreateUserDto, 'roles'> & {
   assignedBy?: string;
 };
 
+/**
+ * Query shape of a UserDto: secrets are omitted, roles are flattened by
+ * toUserDto.
+ */
+
+const USER_DTO_QUERY = {
+  include: {
+    roles: { select: { role: { select: { id: true, name: true } } } },
+  },
+  omit: { password: true, tokenVersion: true },
+} satisfies Prisma.UserFindManyArgs;
+
+type TUserRow = Prisma.UserGetPayload<typeof USER_DTO_QUERY>;
+
+const toUserDto = ({ roles, ...user }: TUserRow): UserDto => ({
+  ...user,
+  roles: roles.map(({ role }) => role),
+});
+
 @Injectable()
 export class UserService {
   constructor(private readonly prisma: PrismaService) {}
@@ -42,20 +61,11 @@ export class UserService {
   ): Promise<UserDto[]> {
     const users = await this.prisma.user.findMany({
       where: { isActive, id: { not: actor.sub }, ...this.visibleTo(actor) },
-      include: {
-        roles: { select: { role: { select: { id: true, name: true } } } },
-      },
-      omit: {
-        password: true,
-        tokenVersion: true,
-      },
+      ...USER_DTO_QUERY,
       orderBy: { createdAt: 'asc' },
     });
 
-    return users.map((user) => ({
-      ...user,
-      roles: user.roles.map(({ role }) => role),
-    }));
+    return users.map(toUserDto);
   }
 
   /**
@@ -87,13 +97,7 @@ export class UserService {
     const [users, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
-        include: {
-          roles: { select: { role: { select: { id: true, name: true } } } },
-        },
-        omit: {
-          password: true,
-          tokenVersion: true,
-        },
+        ...USER_DTO_QUERY,
         orderBy: sortBy ? { email: sortBy } : { createdAt: 'asc' },
         skip: offset,
         take: limit,
@@ -101,14 +105,7 @@ export class UserService {
       this.prisma.user.count({ where }),
     ]);
 
-    return PageDto.of(
-      users.map((user) => ({
-        ...user,
-        roles: user.roles.map(({ role }) => role),
-      })),
-      total,
-      { offset, limit },
-    );
+    return PageDto.of(users.map(toUserDto), total, { offset, limit });
   }
 
   /**
@@ -121,21 +118,12 @@ export class UserService {
   async findByUnique(id: string, actor: TActor): Promise<UserDto> {
     const user = await this.prisma.user.findFirst({
       where: { id, ...this.visibleTo(actor) },
-      include: {
-        roles: { select: { role: { select: { id: true, name: true } } } },
-      },
-      omit: {
-        password: true,
-        tokenVersion: true,
-      },
+      ...USER_DTO_QUERY,
     });
 
     if (!user) throw new NotFoundException('User not found');
 
-    return {
-      ...user,
-      roles: user.roles.map(({ role }) => role),
-    };
+    return toUserDto(user);
   }
 
   /**
@@ -192,6 +180,7 @@ export class UserService {
   }
 
   /**
+   * @param id Unique identifier of the user
    * @param dto User update data. When roles is provided, the user's roles
    * are replaced with the given set.
    * @param actor The signed-in user performing the operation
@@ -200,8 +189,8 @@ export class UserService {
    * may change their own roles or deactivate themselves.
    */
 
-  async update(dto: UpdateUserDto, actor: TActor): Promise<void> {
-    const { id, fullName, email, avatar, isActive, roles } = dto;
+  async update(id: string, dto: UpdateUserDto, actor: TActor): Promise<void> {
+    const { fullName, email, avatar, isActive, roles } = dto;
 
     if (id === actor.sub && !this.isOwner(actor)) {
       if (roles || isActive === false) {

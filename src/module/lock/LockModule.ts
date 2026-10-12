@@ -1,10 +1,12 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+
+import { SessionModule } from '@/module/auth/session';
 
 import { LockGateway } from './LockGateway';
 import { LockService } from './LockService';
 
-@Global()
 @Module({
+  imports: [SessionModule],
   providers: [LockGateway, LockService],
   exports: [LockService],
 })

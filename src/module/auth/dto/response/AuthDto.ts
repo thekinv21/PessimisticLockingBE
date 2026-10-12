@@ -11,4 +11,4 @@ const AuthSchema = z.object({
   refreshTokenExpireAt: z.iso.datetime(),
 });
 
-export class AuthDto extends createZodDto(AuthSchema) {}
+export class AuthDto extends createZodDto(AuthSchema, { codec: true }) {}

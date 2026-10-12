@@ -1,6 +1,6 @@
 import {
-  BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -45,7 +45,9 @@ export class AuthService {
       this.logger.error(
         `Role "${Role.USER}" does not exist. Seed the roles table before registering users.`,
       );
-      throw new BadRequestException('USER role cannot be exist on system');
+      throw new InternalServerErrorException(
+        'Registration is temporarily unavailable.',
+      );
     }
 
     const { fullName, email, password } = dto;

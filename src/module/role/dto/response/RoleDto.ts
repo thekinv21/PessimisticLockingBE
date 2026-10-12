@@ -1,10 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-const IsoDateSchema = z.codec(z.iso.datetime(), z.date(), {
-  decode: (value) => new Date(value),
-  encode: (value) => value.toISOString(),
-});
+import { IsoDateSchema } from '@/shared/schemas';
 
 const RoleSchema = z.object({
   id: z.cuid2(),
@@ -15,4 +12,4 @@ const RoleSchema = z.object({
   updatedAt: IsoDateSchema.optional(),
 });
 
-export class RoleDto extends createZodDto(RoleSchema) {}
+export class RoleDto extends createZodDto(RoleSchema, { codec: true }) {}

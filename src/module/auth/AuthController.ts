@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
 
 import { RateLimitPreset } from '@/shared/constants';
 import { Endpoint, RateLimit } from '@/shared/decorators';
@@ -18,6 +18,7 @@ export class AuthController {
     summary: 'Register a new user',
     description:
       'Creates an account with the USER role. Log in afterwards to get tokens.',
+    status: HttpStatus.CREATED,
   })
   async register(@Body() dto: RegisterDto): Promise<void> {
     await this.authService.register(dto);
